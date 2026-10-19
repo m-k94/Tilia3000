@@ -5,6 +5,7 @@ class TimeXConverter:
     def __init__(self):
         listen(self, Post.FILE_MEDIA_DURATION_CHANGED, self.on_media_duration_changed)
         listen(self, Post.PLAYBACK_AREA_SET_WIDTH, self.on_playback_area_set_width)
+        listen(self, Post.LEFT_MARGIN_SET, self.on_left_margin_set)
 
     def setup(self):
         self.media_duration = get(Get.MEDIA_DURATION)
@@ -19,6 +20,9 @@ class TimeXConverter:
             return
 
         self.playback_area_width = width
+
+    def on_left_margin_set(self, value: int) -> None:
+        self.left_margin_x = value
 
     def get_time_by_x(self, x: float) -> float:
         if not isinstance(x, (float, int)):

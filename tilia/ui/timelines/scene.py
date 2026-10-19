@@ -1,14 +1,15 @@
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QBrush, QColor, QFont, QFontMetrics, QPen
+from PySide6.QtGui import QBrush, QColor, QFont, QPen
 from PySide6.QtWidgets import QGraphicsRectItem, QGraphicsScene
 
-from tilia.requests import Get, Post, get, listen
+from tilia.requests import Post, listen
 from tilia.settings import settings
 from tilia.ui.timelines.labels import get_font
 
 
 class TimelineScene(QGraphicsScene):
     LABEL_Y_MARGIN = 3
+    LABEL_RIGHT_MARGIN = 10
     LOOP_BOX_Z = -100
 
     def __init__(
@@ -41,12 +42,23 @@ class TimelineScene(QGraphicsScene):
     def text_font(self) -> QFont:
         return get_font("general", "timeline_name", self.font().family())
 
-    def _get_elided_text(self, text: str):
-        return QFontMetrics(self.text.font()).elidedText(
-            text,
-            Qt.TextElideMode.ElideRight,
-            get(Get.LEFT_MARGIN_X) - self.LABEL_Y_MARGIN - 10,
+    def update_text_font(self) -> None:
+        self.text.setFont(self.text_font)
+        self.text.setPos(*self.text_pos)
+
+    @property
+    def text_width(self) -> float:
+        """Width the left margin needs to show the whole name."""
+        if not self.text.toPlainText():
+            return 0
+        return (
+            self.LABEL_Y_MARGIN
+            + self.text.boundingRect().width()
+            + self.LABEL_RIGHT_MARGIN
         )
+
+    def set_left_margin(self, value: int) -> None:
+        self.text_bg.setRect(0, 0, value, self.height())
 
     def _setup_text_bg(self, width):
         pen = QPen()
@@ -66,8 +78,6 @@ class TimelineScene(QGraphicsScene):
 
     def on_settings_updated(self, updated_settings):
         if "general" in updated_settings:
-            self.text.setFont(self.text_font)
-            self.set_text(self._text)
             self.text_bg.setBrush(
                 QBrush(QColor(settings.get("general", "timeline_background_color")))
             )
@@ -112,8 +122,7 @@ class TimelineScene(QGraphicsScene):
         self.text.setPos(*self.text_pos)
 
     def set_text(self, value):
-        self._text = value
-        self.text.setPlainText(self._get_elided_text(value))
+        self.text.setPlainText(value)
         self.text.setPos(*self.text_pos)
 
     @property

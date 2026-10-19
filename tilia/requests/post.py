@@ -77,6 +77,7 @@ class Post(Enum):
     INSPECTABLE_ELEMENT_SELECTED = auto()
     INSPECTOR_FIELD_EDITED = auto()
     LONG_OPERATION = auto()
+    LEFT_MARGIN_SET = auto()
     LOOP_IGNORE_COMPONENT = auto()
     MEDIA_METADATA_FIELD_ADD = auto()
     MEDIA_METADATA_FIELD_SET = auto()

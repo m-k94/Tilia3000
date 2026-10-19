@@ -228,6 +228,7 @@ class TimelineUI(ABC):  # noqa: B024
     def update_is_visible(self):
         self.view.set_is_visible(self.get_data("is_visible"))
         self.collection.update_timeline_uis_position()
+        self.collection.update_left_margin()
         self.collection.update_toolbar_visibility()
 
     def update_height(self):
@@ -240,6 +241,7 @@ class TimelineUI(ABC):  # noqa: B024
 
     def update_name(self):
         self.scene.set_text(self.get_data("name"))
+        self.collection.update_left_margin()
 
     def set_width(self, width):
         self.scene.set_width(int(width))

@@ -8,13 +8,15 @@ from tests.ui.timelines.interact import (
     click_timeline_ui_element_body,
 )
 from tests.utils import undoable
-from tilia.requests import Get, Post, post
+from tilia.requests import Get, Post, get, post
 from tilia.settings import settings
 from tilia.timelines.component_kinds import ComponentKind
 from tilia.timelines.marker.timeline import MarkerTimeline
 from tilia.ui import commands
+from tilia.ui.coords import time_x_converter
 from tilia.ui.timelines.base.timeline import TimelineUI
 from tilia.ui.timelines.collection.collection import TimelineSelector
+from tilia.ui.timelines.constants import PLAYBACK_AREA_MARGIN
 
 
 def get_time_shifted_args(args: dict[str, int], d_time) -> dict[str, int]:
@@ -553,3 +555,90 @@ class TestTimelineNameFont:
         font = tluis[0].scene.text.font()
         assert font.pointSize() == 14
         assert font.italic()
+
+
+class TestNameFitsInLeftMargin:
+    LONG_NAME = "A timeline name far too long for the default margin"
+
+    def test_long_name_is_shown_in_full(self, tluis):
+        commands.execute("timelines.add.marker", name=self.LONG_NAME)
+
+        assert tluis[0].displayed_name == self.LONG_NAME
+        assert get(Get.LEFT_MARGIN_X) >= tluis[0].scene.text_width
+
+    def test_short_name_keeps_default_margin(self, tluis):
+        commands.execute("timelines.add.marker", name="short")
+
+        assert get(Get.LEFT_MARGIN_X) == PLAYBACK_AREA_MARGIN
+
+    def test_rename_widens_and_narrows_margin(self, tluis):
+        commands.execute("timelines.add.marker", name="short")
+
+        with undoable():
+            commands.execute("timeline.set_name", tluis[0], name=self.LONG_NAME)
+        assert get(Get.LEFT_MARGIN_X) > PLAYBACK_AREA_MARGIN
+
+        commands.execute("timeline.set_name", tluis[0], name="short")
+        assert get(Get.LEFT_MARGIN_X) == PLAYBACK_AREA_MARGIN
+
+    def test_undo_rename_narrows_margin(self, tluis):
+        commands.execute("timelines.add.marker", name="short")
+        commands.execute("timeline.set_name", tluis[0], name=self.LONG_NAME)
+
+        commands.execute("edit.undo")
+
+        assert get(Get.LEFT_MARGIN_X) == PLAYBACK_AREA_MARGIN
+
+    def test_elements_move_with_margin(self, tluis, tilia_state):
+        commands.execute("timelines.add.marker", name="short")
+        tilia_state.current_time = 10
+        commands.execute("timeline.marker.add")
+
+        commands.execute("timeline.set_name", tluis[0], name=self.LONG_NAME)
+
+        marker = tluis[0][0]
+        assert marker.x == time_x_converter.get_x_by_time(10)
+        assert marker.x > get(Get.LEFT_MARGIN_X)
+        assert time_x_converter.get_x_by_time(0) == get(Get.LEFT_MARGIN_X)
+
+    def test_name_background_covers_margin(self, tluis):
+        commands.execute("timelines.add.marker", name=self.LONG_NAME)
+
+        assert tluis[0].scene.text_bg.rect().width() == get(Get.LEFT_MARGIN_X)
+
+    def test_other_timelines_follow_margin(self, tluis):
+        commands.execute("timelines.add.marker", name="short")
+        commands.execute("timelines.add.marker", name=self.LONG_NAME)
+
+        for tlui in tluis:
+            assert tlui.scene.text_bg.rect().width() == get(Get.LEFT_MARGIN_X)
+            assert tlui.scene.playback_line.line().x1() == get(Get.LEFT_MARGIN_X)
+
+    def test_hiding_timeline_narrows_margin(self, tluis):
+        commands.execute("timelines.add.marker", name="short")
+        commands.execute("timelines.add.marker", name=self.LONG_NAME)
+        long_named = next(t for t in tluis if t.get_data("name") == self.LONG_NAME)
+
+        commands.execute("timeline.set_is_visible", long_named, False)
+        assert get(Get.LEFT_MARGIN_X) == PLAYBACK_AREA_MARGIN
+
+        commands.execute("timeline.set_is_visible", long_named, True)
+        assert get(Get.LEFT_MARGIN_X) > PLAYBACK_AREA_MARGIN
+
+    def test_deleting_timeline_narrows_margin(self, tluis):
+        commands.execute("timelines.add.marker", name=self.LONG_NAME)
+
+        commands.execute("timeline.delete", tluis[0], confirm=False)
+
+        assert get(Get.LEFT_MARGIN_X) == PLAYBACK_AREA_MARGIN
+
+    def test_larger_name_font_widens_margin(self, tluis):
+        name = "Bars"
+        commands.execute("timelines.add.marker", name=name)
+        assert get(Get.LEFT_MARGIN_X) == PLAYBACK_AREA_MARGIN
+
+        settings.set("general", "timeline_name_font_size", 30)
+        post(Post.SETTINGS_UPDATED, ["general"])
+
+        assert get(Get.LEFT_MARGIN_X) > PLAYBACK_AREA_MARGIN
+        assert tluis[0].displayed_name == name

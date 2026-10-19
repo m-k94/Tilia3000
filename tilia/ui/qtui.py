@@ -246,6 +246,7 @@ class QtUI:
             (Post.FILE_SAVED, self.on_file_saved),
             (Post.MEDIA_METADATA_TITLE_UPDATED, self.on_metadata_title_set_done),
             (Post.PLAYBACK_AREA_SET_WIDTH, self.on_timeline_set_width),
+            (Post.LEFT_MARGIN_SET, self.on_left_margin_set),
             (Post.WINDOW_OPEN, self.on_window_open),
             (Post.WINDOW_CLOSE, self.on_window_close),
             (Post.WINDOW_CLOSE_DONE, self.on_window_close_done),
@@ -391,6 +392,9 @@ class QtUI:
 
         self.playback_area_width = value
         post(Post.TIMELINE_WIDTH_SET_DONE, self.timeline_width)
+
+    def on_left_margin_set(self, value: int) -> None:
+        self.playback_area_margin = value
 
     def launch(self):
         self.main_window.show()
