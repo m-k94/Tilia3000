@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Callable
 
 from PySide6.QtCore import QLineF, QPointF, Qt
-from PySide6.QtGui import QColor, QFont, QPen
+from PySide6.QtGui import QColor, QPen
 from PySide6.QtWidgets import QGraphicsLineItem, QGraphicsScene, QGraphicsTextItem
 
 from tilia.requests import Get, Post, get, post
@@ -16,6 +16,7 @@ from ...windows.inspect import InspectRowKind
 from ..copy_paste import CopyAttributes
 from ..cursors import CursorMixIn
 from ..drag import DragManager
+from ..labels import get_label_font
 from .context_menu import BeatContextMenu
 
 if TYPE_CHECKING:
@@ -252,9 +253,11 @@ class BeatLabel(QGraphicsTextItem):
         self.set_position(x, y)
 
     def _setup_font(self):
-        font = QFont("Arial", 10)
-        self.setFont(font)
+        self.setFont(get_label_font("beat_timeline"))
         self.setDefaultTextColor(QColor("black"))
+
+    def update_font(self):
+        self._setup_font()
 
     def get_point(self, x: float, y: float):
         return QPointF(x - self.boundingRect().width() / 2, y)

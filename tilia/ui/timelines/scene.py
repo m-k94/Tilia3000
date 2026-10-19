@@ -1,9 +1,10 @@
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QBrush, QColor, QFontMetrics, QPen
+from PySide6.QtGui import QBrush, QColor, QFont, QFontMetrics, QPen
 from PySide6.QtWidgets import QGraphicsRectItem, QGraphicsScene
 
 from tilia.requests import Get, Post, get, listen
 from tilia.settings import settings
+from tilia.ui.timelines.labels import get_font
 
 
 class TimelineScene(QGraphicsScene):
@@ -32,12 +33,16 @@ class TimelineScene(QGraphicsScene):
         )
 
     def _setup_text(self, text: str):
-        self.text = self.addText(self._get_elided_text(text), self.font())
+        self.text = self.addText("", self.text_font)
         self.text.setDefaultTextColor(QColor("black"))
-        self.text.setPos(*self.text_pos)
+        self.set_text(text)
+
+    @property
+    def text_font(self) -> QFont:
+        return get_font("general", "timeline_name", self.font().family())
 
     def _get_elided_text(self, text: str):
-        return QFontMetrics(self.font()).elidedText(
+        return QFontMetrics(self.text.font()).elidedText(
             text,
             Qt.TextElideMode.ElideRight,
             get(Get.LEFT_MARGIN_X) - self.LABEL_Y_MARGIN - 10,
@@ -61,6 +66,8 @@ class TimelineScene(QGraphicsScene):
 
     def on_settings_updated(self, updated_settings):
         if "general" in updated_settings:
+            self.text.setFont(self.text_font)
+            self.set_text(self._text)
             self.text_bg.setBrush(
                 QBrush(QColor(settings.get("general", "timeline_background_color")))
             )
@@ -105,7 +112,9 @@ class TimelineScene(QGraphicsScene):
         self.text.setPos(*self.text_pos)
 
     def set_text(self, value):
+        self._text = value
         self.text.setPlainText(self._get_elided_text(value))
+        self.text.setPos(*self.text_pos)
 
     @property
     def text_pos(self):

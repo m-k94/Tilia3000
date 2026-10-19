@@ -118,6 +118,7 @@ class HierarchyTimelineUI(TimelineUI):
                 self.id, "height", self.timeline.default_height
             )
             for hierarchy_ui in self:
+                hierarchy_ui.update_label_font()
                 hierarchy_ui.update_position()
                 hierarchy_ui.update_color()
 

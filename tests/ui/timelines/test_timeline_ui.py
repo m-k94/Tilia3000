@@ -9,6 +9,7 @@ from tests.ui.timelines.interact import (
 )
 from tests.utils import undoable
 from tilia.requests import Get, Post, post
+from tilia.settings import settings
 from tilia.timelines.component_kinds import ComponentKind
 from tilia.timelines.marker.timeline import MarkerTimeline
 from tilia.ui import commands
@@ -413,3 +414,142 @@ def test_ensure_timeline_ui_subclasses_is_only_called_once():
         for _ in range(50):
             TimelineUI.subclasses()
         assert wrapped.call_count == 1
+
+
+@pytest.mark.parametrize(
+    "tlui, group, add_element",
+    [
+        (
+            "hierarchy_tlui",
+            "hierarchy_timeline",
+            lambda: commands.execute(
+                "timeline.hierarchy.add", start=0, end=50, level=1
+            ),
+        ),
+        (
+            "range_tlui",
+            "range_timeline",
+            lambda: commands.execute("timeline.range.add_range", start=0, end=50),
+        ),
+        ("beat_tlui", "beat_timeline", lambda: commands.execute("timeline.beat.add")),
+    ],
+)
+class TestLabelFont:
+    @staticmethod
+    def set_font(group, size, bold, italic, underline):
+        settings.set(group, "label_font_size", size)
+        settings.set(group, "label_bold", bold)
+        settings.set(group, "label_italic", italic)
+        settings.set(group, "label_underline", underline)
+
+    @staticmethod
+    def assert_font(element, size, bold, italic, underline):
+        font = element.label.font()
+        assert font.pointSize() == size
+        assert font.bold() == bold
+        assert font.italic() == italic
+        assert font.underline() == underline
+
+    def test_settings_change_restyles_labels(self, tlui, group, add_element, request):
+        tlui = request.getfixturevalue(tlui)
+        add_element()
+
+        self.set_font(group, 18, True, True, True)
+        post(Post.SETTINGS_UPDATED, [group])
+
+        self.assert_font(tlui[0], 18, True, True, True)
+
+    def test_new_labels_use_settings(self, qtui, tlui, group, add_element, request):
+        tlui = request.getfixturevalue(tlui)
+        self.set_font(group, 6, False, True, False)
+
+        add_element()
+
+        self.assert_font(tlui[0], 6, False, True, False)
+
+    def test_other_kinds_settings_dont_apply(self, tlui, group, add_element, request):
+        tlui = request.getfixturevalue(tlui)
+        self.set_font(group, 10, False, False, False)
+        add_element()
+        other_group = "marker_timeline"
+        self.set_font(other_group, 20, True, True, True)
+
+        post(Post.SETTINGS_UPDATED, [other_group, group])
+
+        self.assert_font(tlui[0], 10, False, False, False)
+
+
+class TestMarkerLabelFont:
+    def test_settings_change_restyles_labels(self, marker_tlui):
+        commands.execute("timeline.marker.add")
+
+        TestLabelFont.set_font("marker_timeline", 18, True, False, True)
+        post(Post.SETTINGS_UPDATED, ["marker_timeline"])
+
+        TestLabelFont.assert_font(marker_tlui[0], 18, True, False, True)
+
+    def test_label_stays_centred_on_marker(self, marker_tlui):
+        commands.execute("timeline.marker.add")
+
+        TestLabelFont.set_font("marker_timeline", 30, False, False, False)
+        post(Post.SETTINGS_UPDATED, ["marker_timeline"])
+
+        label = marker_tlui[0].label
+        assert label.x() + label.boundingRect().width() / 2 == pytest.approx(
+            marker_tlui[0].x
+        )
+
+
+class TestHierarchyLabelFont:
+    def test_larger_font_crops_label_more(self, hierarchy_tlui):
+        commands.execute(
+            "timeline.hierarchy.add", start=0, end=1, level=1, label="a long label"
+        )
+        settings.set("hierarchy_timeline", "label_font_size", 10)
+        post(Post.SETTINGS_UPDATED, ["hierarchy_timeline"])
+        cropped_small = hierarchy_tlui[0].label.toPlainText()
+
+        settings.set("hierarchy_timeline", "label_font_size", 20)
+        post(Post.SETTINGS_UPDATED, ["hierarchy_timeline"])
+
+        assert len(hierarchy_tlui[0].label.toPlainText()) < len(cropped_small)
+
+    def test_label_is_centred_in_its_level(self, hierarchy_tlui):
+        commands.execute(
+            "timeline.hierarchy.add", start=0, end=50, level=2, label="label"
+        )
+        settings.set("hierarchy_timeline", "label_font_size", 8)
+        post(Post.SETTINGS_UPDATED, ["hierarchy_timeline"])
+
+        element = hierarchy_tlui[0]
+        label = element.label
+        level_top = element.body.rect().top()
+        level_height = settings.get("hierarchy_timeline", "level_height_diff")
+        label_centre = label.y() + label.boundingRect().height() / 2
+        assert label_centre == pytest.approx(level_top + level_height / 2)
+
+
+class TestTimelineNameFont:
+    def test_settings_change_restyles_name(self, marker_tlui):
+        settings.set("general", "timeline_name_font_size", 16)
+        settings.set("general", "timeline_name_bold", True)
+        settings.set("general", "timeline_name_italic", True)
+        settings.set("general", "timeline_name_underline", True)
+
+        post(Post.SETTINGS_UPDATED, ["general"])
+
+        font = marker_tlui.scene.text.font()
+        assert font.pointSize() == 16
+        assert font.bold()
+        assert font.italic()
+        assert font.underline()
+
+    def test_new_timeline_uses_settings(self, tluis):
+        settings.set("general", "timeline_name_font_size", 14)
+        settings.set("general", "timeline_name_italic", True)
+
+        commands.execute("timelines.add.marker", name="name")
+
+        font = tluis[0].scene.text.font()
+        assert font.pointSize() == 14
+        assert font.italic()

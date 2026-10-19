@@ -54,6 +54,10 @@ class SettingsManager(QObject):
             "timeline_background_color": "#EEE",
             "loop_box_shade": "#78c0c0c0",
             "prioritise_performance": "true",
+            "timeline_name_font_size": 10,
+            "timeline_name_bold": "false",
+            "timeline_name_italic": "false",
+            "timeline_name_underline": "false",
         },
         "auto-save": {"max_stored_files": 100, "interval_(seconds)": 300},
         "media_metadata": {
@@ -85,7 +89,14 @@ class SettingsManager(QObject):
             "default_color": "#3399FF",
             "max_divisions": 2500,
         },
-        "beat_timeline": {"display_measure_periodicity": 4, "default_height": 35},
+        "beat_timeline": {
+            "display_measure_periodicity": 4,
+            "default_height": 35,
+            "label_font_size": 10,
+            "label_bold": "false",
+            "label_italic": "false",
+            "label_underline": "false",
+        },
         "hierarchy_timeline": {
             "default_height": 120,
             "default_colors": [
@@ -106,12 +117,20 @@ class SettingsManager(QObject):
             "divider_height": 10,
             "prompt_create_level_below": "true",
             "merge_separator": "|",
+            "label_font_size": 10,
+            "label_bold": "false",
+            "label_italic": "false",
+            "label_underline": "false",
         },
         "marker_timeline": {
             "default_height": 30,
             "marker_width": 8,
             "marker_height": 10,
             "default_color": "#999999",
+            "label_font_size": 10,
+            "label_bold": "false",
+            "label_italic": "false",
+            "label_underline": "false",
         },
         "score_timeline": {
             "default_height": 160,
@@ -131,6 +150,10 @@ class SettingsManager(QObject):
             "merge_separator": "|",
             "always_show_extensions": "false",
             "split_all_rows": "false",
+            "label_font_size": 8,
+            "label_bold": "false",
+            "label_italic": "false",
+            "label_underline": "false",
         },
         "PDF_timeline": {
             "default_height": 30,

@@ -44,6 +44,7 @@ class MarkerTimelineUI(TimelineUI):
                 self.id, "height", self.timeline.default_height
             )
             for marker_ui in self:
+                marker_ui.label.update_font()
                 marker_ui.update_time()
                 marker_ui.update_color()
 

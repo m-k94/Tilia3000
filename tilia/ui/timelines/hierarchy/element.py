@@ -27,6 +27,7 @@ from ...consts import TINT_FACTOR_ON_SELECTION
 from ...coords import time_x_converter
 from ...windows.inspect import HIDE_FIELD, InspectRowKind
 from ..cursors import CursorMixIn
+from ..labels import get_label_font
 from .context_menu import HierarchyContextMenu
 from .handles import HierarchyBodyHandle, HierarchyFrameHandle
 
@@ -223,7 +224,7 @@ class HierarchyUI(TimelineUIElement):
         """
         Calculates and stores width of substrings of 'value'
         """
-        font_metrics = QFontMetrics(QFont("Arial", 10))
+        font_metrics = QFontMetrics(get_label_font("hierarchy_timeline"))
         self.label_substrings_widths = [
             font_metrics.horizontalAdvance(value[: i + 1]) for i in range(len(value))
         ]
@@ -262,6 +263,11 @@ class HierarchyUI(TimelineUIElement):
     def update_level(self):
         self.update_position()
         self.update_color()
+
+    def update_label_font(self):
+        self.label.setup_font()
+        self.update_label_substrings_widths(self.get_data("label"))
+        self.update_label()
 
     def update_end(self):
         self.update_position()
@@ -719,13 +725,12 @@ class HierarchyLabel(CursorMixIn, QGraphicsTextItem):
         self.set_position(x, tl_height, level)
 
     def setup_font(self):
-        font = QFont("Arial", 10)
-        self.setFont(font)
+        self.setFont(get_label_font("hierarchy_timeline"))
         self.setDefaultTextColor(QColor("black"))
 
     def get_point(self, x: float, tl_height, level):
         x = x - self.boundingRect().width() / 2
-        y = (
+        top = (
             tl_height
             - HierarchyUI.Y_OFFSET
             - (
@@ -733,6 +738,13 @@ class HierarchyLabel(CursorMixIn, QGraphicsTextItem):
                 + ((level - 1) * HierarchyUI.x_increment_per_lvl())
             )
         )
+        # Centred in the part of the body that lower levels leave visible.
+        visible_height = (
+            HierarchyUI.base_height()
+            if level == 1
+            else HierarchyUI.x_increment_per_lvl()
+        )
+        y = top + (visible_height - self.boundingRect().height()) / 2
         return QPointF(x, y)
 
     def set_position(self, x, tl_height, level):
