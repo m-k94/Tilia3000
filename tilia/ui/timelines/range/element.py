@@ -17,7 +17,7 @@ from tilia.ui.consts import TINT_FACTOR_ON_SELECTION
 from tilia.ui.timelines.base.element import TimelineUIElement
 from tilia.ui.timelines.copy_paste import CopyAttributes
 from tilia.ui.timelines.cursors import CursorMixIn
-from tilia.ui.timelines.labels import elide_text
+from tilia.ui.timelines.labels import elide_text, get_label_font
 from tilia.ui.timelines.range.context_menu import RangeContextMenu
 from tilia.ui.timelines.range.drag import start_body_drag, start_drag
 from tilia.ui.timelines.range.handles import RangeBodyHandle, RangeFrameHandle
@@ -565,9 +565,14 @@ class RangeLabel(CursorMixIn, QGraphicsTextItem):
         self.set_position(start_x, end_x, y, height, alignment)
 
     def setup_font(self) -> None:
-        font = QFont("Arial", 8)
-        self.setFont(font)
+        self.setFont(get_label_font("range_timeline"))
         self.setDefaultTextColor(QColor("black"))
+
+    def update_font(self) -> None:
+        self.setup_font()
+        # Elided for the old font; elide the full text again.
+        self.setPlainText("")
+        self._reflow()
 
     def set_position(
         self,

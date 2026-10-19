@@ -139,10 +139,15 @@ class HarmonyTimelineUI(TimelineUI):
         self.element_manager.update_time_on_elements()
         self.update_level_labels()
 
+    def set_width(self, width):
+        super().set_width(width)
+        self.update_level_labels()
+
     def update_level_labels(self):
         self.harmony_level_label.set_position(
             get(Get.LEFT_MARGIN_X) - 5, self.get_y(1) - 5
         )
+        self.key_level_label.set_position(get(Get.LEFT_MARGIN_X) - 5, self.get_y(2) - 5)
         self.key_level_label.setVisible(self.get_data("visible_level_count") == 2)
 
     def get_y(self, level: int):
