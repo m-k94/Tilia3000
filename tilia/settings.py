@@ -58,6 +58,7 @@ class SettingsManager(QObject):
             "timeline_name_bold": "false",
             "timeline_name_italic": "false",
             "timeline_name_underline": "false",
+            "timeline_name_alignment": "left",
         },
         "auto-save": {"max_stored_files": 100, "interval_(seconds)": 300},
         "media_metadata": {

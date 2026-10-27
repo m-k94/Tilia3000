@@ -17,6 +17,7 @@ from tilia.ui.coords import time_x_converter
 from tilia.ui.timelines.base.timeline import TimelineUI
 from tilia.ui.timelines.collection.collection import TimelineSelector
 from tilia.ui.timelines.constants import PLAYBACK_AREA_MARGIN
+from tilia.ui.timelines.scene import TimelineScene
 
 
 def get_time_shifted_args(args: dict[str, int], d_time) -> dict[str, int]:
@@ -555,6 +556,71 @@ class TestTimelineNameFont:
         font = tluis[0].scene.text.font()
         assert font.pointSize() == 14
         assert font.italic()
+
+
+class TestTimelineNameAlignment:
+    LONG_NAME = "A timeline name far too long for the default margin"
+
+    @staticmethod
+    def name_bounds(tlui) -> tuple[float, float]:
+        x = tlui.scene.text.pos().x()
+        return x, x + tlui.scene.text.boundingRect().width()
+
+    def test_left_by_default(self, tluis):
+        commands.execute("timelines.add.marker", name="short")
+
+        assert self.name_bounds(tluis[0])[0] == TimelineScene.LABEL_Y_MARGIN
+
+    @pytest.mark.parametrize("alignment", ["left", "center", "right"])
+    def test_settings_change_realigns_name(self, tluis, alignment):
+        commands.execute("timelines.add.marker", name="short")
+
+        settings.set("general", "timeline_name_alignment", alignment)
+        post(Post.SETTINGS_UPDATED, ["general"])
+
+        start, end = self.name_bounds(tluis[0])
+        left_space = start - TimelineScene.LABEL_Y_MARGIN
+        right_space = get(Get.LEFT_MARGIN_X) - TimelineScene.LABEL_RIGHT_MARGIN - end
+        if alignment == "left":
+            assert left_space == 0
+        elif alignment == "center":
+            assert left_space == pytest.approx(right_space)
+        else:
+            assert right_space == pytest.approx(0)
+
+    def test_new_timeline_uses_settings(self, tluis):
+        settings.set("general", "timeline_name_alignment", "right")
+
+        commands.execute("timelines.add.marker", name="short")
+
+        end = self.name_bounds(tluis[0])[1]
+        assert end == pytest.approx(
+            get(Get.LEFT_MARGIN_X) - TimelineScene.LABEL_RIGHT_MARGIN
+        )
+
+    def test_short_name_follows_margin_widened_by_other_timeline(self, tluis):
+        settings.set("general", "timeline_name_alignment", "right")
+        commands.execute("timelines.add.marker", name="short")
+        short_named = tluis[0]
+
+        commands.execute("timelines.add.marker", name=self.LONG_NAME)
+
+        end = self.name_bounds(short_named)[1]
+        assert end == pytest.approx(
+            get(Get.LEFT_MARGIN_X) - TimelineScene.LABEL_RIGHT_MARGIN
+        )
+
+    @pytest.mark.parametrize("alignment", ["center", "right"])
+    def test_widest_name_fills_margin(self, tluis, alignment):
+        settings.set("general", "timeline_name_alignment", alignment)
+
+        commands.execute("timelines.add.marker", name=self.LONG_NAME)
+
+        # The margin is rounded up to a whole pixel, which leaves under a
+        # pixel of slack for the name to move into.
+        start, end = self.name_bounds(tluis[0])
+        assert start == pytest.approx(TimelineScene.LABEL_Y_MARGIN, abs=1)
+        assert end <= get(Get.LEFT_MARGIN_X) - TimelineScene.LABEL_RIGHT_MARGIN
 
 
 class TestNameFitsInLeftMargin:

@@ -59,6 +59,7 @@ class TimelineScene(QGraphicsScene):
 
     def set_left_margin(self, value: int) -> None:
         self.text_bg.setRect(0, 0, value, self.height())
+        self.text.setPos(*self.text_pos)
 
     def _setup_text_bg(self, width):
         pen = QPen()
@@ -126,9 +127,21 @@ class TimelineScene(QGraphicsScene):
         self.text.setPos(*self.text_pos)
 
     @property
-    def text_pos(self):
+    def text_pos(self) -> tuple[float, float]:
+        # The name is aligned within the margin, between the same paddings
+        # that text_width reserves around it.
+        left = self.LABEL_Y_MARGIN
+        right = self.text_bg.rect().width() - self.LABEL_RIGHT_MARGIN
+        text_width = self.text.boundingRect().width()
+        alignment = settings.get("general", "timeline_name_alignment")
+        if alignment == "center":
+            x = max((left + right - text_width) / 2, left)
+        elif alignment == "right":
+            x = max(right - text_width, left)
+        else:
+            x = left
         return (
-            self.LABEL_Y_MARGIN,
+            x,
             self.height() / 2 - self.text.boundingRect().height() / 2,
         )
 
