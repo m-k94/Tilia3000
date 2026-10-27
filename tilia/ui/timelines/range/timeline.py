@@ -238,6 +238,7 @@ class RangeTimelineUI(TimelineUI):
             self.update_height()
             self.update_row_labels()
             for element in self:
+                element.label.update_font()
                 element.update_color()
                 element.update_position()
 

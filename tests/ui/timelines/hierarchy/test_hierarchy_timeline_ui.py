@@ -6,12 +6,13 @@ from PySide6.QtGui import QColor
 
 import tilia.errors
 from tests.mock import patch_yes_or_no_dialog
-from tests.utils import get_command_names, undoable
+from tests.utils import get_command_names, save_and_reopen, undoable
 from tilia.requests import Post, post
 from tilia.settings import settings
 from tilia.timelines.hierarchy.components import Hierarchy
 from tilia.ui import commands
-from tilia.ui.timelines.hierarchy import HierarchyUI
+from tilia.ui.coords import time_x_converter
+from tilia.ui.timelines.hierarchy import HierarchyTimelineUI, HierarchyUI
 from tilia.ui.timelines.hierarchy.context_menu import HierarchyContextMenu
 
 
@@ -260,6 +261,152 @@ class TestActions:
         commands.execute("timeline.hierarchy.create_child")
 
         assert len(tlui) == 2
+
+
+class TestUnrestrictedMerge:
+    @staticmethod
+    def element_at(tlui, start: float, level: int) -> HierarchyUI:
+        return next(
+            e
+            for e in tlui
+            if e.get_data("start") == start and e.get_data("level") == level
+        )
+
+    @staticmethod
+    def setup_units_with_different_parents():
+        commands.execute("timeline.hierarchy.add", start=0, end=1, level=1)
+        commands.execute("timeline.hierarchy.add", start=1, end=2, level=1)
+        commands.execute("timeline.hierarchy.add", start=2, end=3, level=1)
+        commands.execute("timeline.hierarchy.add", start=0, end=1, level=2)
+        commands.execute("timeline.hierarchy.add", start=1, end=3, level=2)
+
+    def merge(self, tlui, *start_and_levels: tuple[float, int]):
+        for start, level in start_and_levels:
+            tlui.select_element(self.element_at(tlui, start, level))
+        commands.execute("timeline.hierarchy.merge")
+
+    def test_different_parents_fails_by_default(self, tlui, tilia_errors):
+        settings.set("hierarchy_timeline", "unrestricted_merge", False)
+        self.setup_units_with_different_parents()
+
+        self.merge(tlui, (0, 1), (1, 1))
+
+        assert len(tlui) == 5
+        tilia_errors.assert_in_error_message("common parent")
+
+    def test_different_parents(self, tlui, tilia_errors):
+        settings.set("hierarchy_timeline", "unrestricted_merge", True)
+        self.setup_units_with_different_parents()
+
+        with undoable():
+            self.merge(tlui, (0, 1), (1, 1))
+
+        tilia_errors.assert_no_error()
+        assert len(tlui) == 4
+        assert self.element_at(tlui, 0, 1).get_data("end") == 2
+        assert self.element_at(tlui, 2, 1).get_data("end") == 3
+
+    def test_units_between_with_different_parent_are_merged(self, tlui):
+        settings.set("hierarchy_timeline", "unrestricted_merge", True)
+        self.setup_units_with_different_parents()
+
+        self.merge(tlui, (0, 1), (2, 1))
+
+        level_1 = [e for e in tlui if e.get_data("level") == 1]
+        assert len(level_1) == 1
+        assert level_1[0].get_data("start") == 0
+        assert level_1[0].get_data("end") == 3
+
+    def test_units_between_at_other_level_are_kept(self, tlui):
+        settings.set("hierarchy_timeline", "unrestricted_merge", True)
+        commands.execute("timeline.hierarchy.add", start=0, end=1, level=2)
+        commands.execute("timeline.hierarchy.add", start=1, end=2, level=1)
+        commands.execute("timeline.hierarchy.add", start=2, end=3, level=2)
+
+        self.merge(tlui, (0, 2), (2, 2))
+
+        assert len(tlui) == 2
+        assert self.element_at(tlui, 0, 2).get_data("end") == 3
+        assert self.element_at(tlui, 1, 1).get_data("end") == 2
+
+    def test_different_levels_still_fails(self, tlui, tilia_errors):
+        settings.set("hierarchy_timeline", "unrestricted_merge", True)
+        commands.execute("timeline.hierarchy.add", start=0, end=1, level=1)
+        commands.execute("timeline.hierarchy.add", start=1, end=2, level=2)
+
+        self.merge(tlui, (0, 1), (1, 2))
+
+        assert len(tlui) == 2
+        tilia_errors.assert_in_error_message("same level")
+
+    def test_merged_unit_survives_save_and_reopen(self, tlui, tluis, tmp_path):
+        settings.set("hierarchy_timeline", "unrestricted_merge", True)
+        self.setup_units_with_different_parents()
+
+        self.merge(tlui, (0, 1), (1, 1))
+        save_and_reopen(tmp_path)
+
+        reloaded = next(t for t in tluis if isinstance(t, HierarchyTimelineUI))
+        assert len(reloaded) == 4
+        assert self.element_at(reloaded, 0, 1).get_data("end") == 2
+
+    @staticmethod
+    def handle_at(tlui, time: float):
+        return tlui.get_handle_by_x(time_x_converter.get_x_by_time(time))
+
+    def test_crossed_boundary_is_hidden(self, tlui):
+        settings.set("hierarchy_timeline", "unrestricted_merge", True)
+        self.setup_units_with_different_parents()
+
+        self.merge(tlui, (0, 1), (1, 1))
+        tlui.deselect_all_elements()
+
+        assert not self.handle_at(tlui, 1).isVisible()
+        for time in (0, 2, 3):
+            assert self.handle_at(tlui, time).isVisible()
+
+    def test_crossed_boundary_shows_while_its_unit_is_selected(self, tlui):
+        settings.set("hierarchy_timeline", "unrestricted_merge", True)
+        self.setup_units_with_different_parents()
+        self.merge(tlui, (0, 1), (1, 1))
+        tlui.deselect_all_elements()
+        parent = self.element_at(tlui, 1, 2)
+
+        tlui.select_element(parent)
+        assert self.handle_at(tlui, 1).isVisible()
+
+        tlui.deselect_element(parent)
+        assert not self.handle_at(tlui, 1).isVisible()
+
+    def test_selecting_crossing_unit_keeps_boundary_hidden(self, tlui):
+        settings.set("hierarchy_timeline", "unrestricted_merge", True)
+        self.setup_units_with_different_parents()
+        self.merge(tlui, (0, 1), (1, 1))
+        tlui.deselect_all_elements()
+
+        tlui.select_element(self.element_at(tlui, 0, 1))
+
+        assert not self.handle_at(tlui, 1).isVisible()
+
+    def test_crossed_boundary_shows_again_on_undo(self, tlui):
+        settings.set("hierarchy_timeline", "unrestricted_merge", True)
+        self.setup_units_with_different_parents()
+        post(Post.APP_STATE_RECORD, "test state")
+        self.merge(tlui, (0, 1), (1, 1))
+
+        commands.execute("edit.undo")
+
+        assert self.handle_at(tlui, 1).isVisible()
+
+    def test_crossed_boundary_stays_hidden_after_reopen(self, tlui, tluis, tmp_path):
+        settings.set("hierarchy_timeline", "unrestricted_merge", True)
+        self.setup_units_with_different_parents()
+        self.merge(tlui, (0, 1), (1, 1))
+
+        save_and_reopen(tmp_path)
+
+        reloaded = next(t for t in tluis if isinstance(t, HierarchyTimelineUI))
+        assert not self.handle_at(reloaded, 1).isVisible()
 
 
 class TestAddFrameValidation:

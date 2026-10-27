@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QPointF, Qt
-from PySide6.QtGui import QColor, QFont, QPen, QPolygonF
+from PySide6.QtGui import QColor, QPen, QPolygonF
 from PySide6.QtWidgets import (
     QGraphicsItem,
     QGraphicsPolygonItem,
@@ -21,6 +21,7 @@ from ...windows.inspect import InspectRowKind
 from ..copy_paste import CopyAttributes
 from ..cursors import CursorMixIn
 from ..drag import DragManager
+from ..labels import get_label_font
 from .context_menu import MarkerContextMenu
 
 
@@ -216,9 +217,11 @@ class MarkerLabel(QGraphicsTextItem):
         self.set_position(x, y)
 
     def _setup_font(self):
-        font = QFont("Arial", 10)
-        self.setFont(font)
+        self.setFont(get_label_font("marker_timeline"))
         self.setDefaultTextColor(QColor("black"))
+
+    def update_font(self):
+        self._setup_font()
 
     def get_point(self, x: float, y: float):
         return QPointF(x - self.boundingRect().width() / 2, y)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import math
 import traceback
 from enum import Enum, auto
 from typing import TYPE_CHECKING, Any, Callable, cast
@@ -42,6 +43,7 @@ from tilia.ui.timelines.collection.import_ import _on_import_to_timeline
 from tilia.ui.timelines.constants import (
     MAX_PLAYBACK_WIDTH,
     PIXELS_PER_SECOND,
+    PLAYBACK_AREA_MARGIN,
     PLAYBACK_AREA_WIDTH,
     ZOOM_MULTIPLIER,
 )
@@ -476,6 +478,7 @@ class TimelineUIs:
             (Post.SELECTION_BOX_SELECT_ITEM, self.on_selection_box_select_item),
             (Post.SELECTION_BOX_DESELECT_ITEM, self.on_selection_box_deselect_item),
             (Post.TIMELINE_WIDTH_SET_DONE, self.on_timeline_width_set_done),
+            (Post.SETTINGS_UPDATED, self.on_settings_updated),
             (Post.TIMELINES_CROP_DONE, self.on_timelines_crop_done),
             (
                 Post.BEAT_TIMELINE_MEASURE_NUMBER_CHANGE_DONE,
@@ -697,6 +700,34 @@ class TimelineUIs:
 
     def update_timeline_ui_ordinal(self):
         self.update_timeline_uis_position()
+
+    def update_left_margin(self) -> None:
+        """Widens the left margin so that every visible timeline name shows
+        in full, or narrows it back to its default."""
+        margin = math.ceil(
+            max(
+                [PLAYBACK_AREA_MARGIN]
+                + [
+                    tlui.scene.text_width
+                    for tlui in self
+                    if tlui.get_data("is_visible")
+                ]
+            )
+        )
+        if margin == get(Get.LEFT_MARGIN_X):
+            return
+
+        post(Post.LEFT_MARGIN_SET, margin)
+        for tlui in self:
+            tlui.scene.set_left_margin(margin)
+        # Lays out every timeline again, as an x depends on the margin.
+        self.on_timeline_width_set_done(get(Get.TIMELINE_WIDTH))
+
+    def on_settings_updated(self, updated_settings: list[str]) -> None:
+        if "general" in updated_settings:
+            for tlui in self:
+                tlui.scene.update_text_font()
+            self.update_left_margin()
 
     @staticmethod
     def update_timeline_times(tlui: TimelineUI):
@@ -1669,9 +1700,11 @@ class TimelineUIs:
 
     def on_timeline_created(self, kind: type[Timeline], id: int):
         self.create_timeline_ui(kind, id)
+        self.update_left_margin()
 
     def on_timeline_deleted(self, id: int):
         self.delete_timeline_ui(self.get_timeline_ui(id))
+        self.update_left_margin()
 
 
 class TimelineSelector(Enum):

@@ -202,6 +202,7 @@ class BeatTimelineUI(TimelineUI):
     def on_settings_updated(self, updated_settings):
         if "beat_timeline" in updated_settings:
             for beat_ui in self:
+                beat_ui.label.update_font()
                 beat_ui.update_label()
 
     def _deselect_all_but_last(self):
