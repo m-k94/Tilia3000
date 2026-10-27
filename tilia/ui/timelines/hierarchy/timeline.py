@@ -1,3 +1,5 @@
+import bisect
+import itertools
 from typing import Callable
 
 import tilia.ui.strings
@@ -167,6 +169,69 @@ class HierarchyTimelineUI(TimelineUI):
             return min(later_marker_xs)
         else:
             return None
+
+    def on_timeline_component_created(
+        self, kind: ComponentKind, id: int, get_data, set_data
+    ) -> HierarchyUI:
+        element = super().on_timeline_component_created(kind, id, get_data, set_data)
+        self.update_body_handles_visibility()
+        return element
+
+    def on_timeline_component_deleted(self, id: int) -> None:
+        super().on_timeline_component_deleted(id)
+        self.update_body_handles_visibility()
+
+    def update_body_handles_visibility(self) -> None:
+        """Hides the body handles that cut through a unit, unless one of the
+        units they belong to is selected. Lower levels are drawn in front, so a
+        handle cuts through a unit that spans across it at the level of the
+        handle's units or below. That only happens when a unit crosses another
+        one's boundary, as after an unrestricted merge."""
+        elements = list(self)
+
+        # per level, spans sorted by start and the furthest end among the
+        # spans starting at or before each one
+        level_to_spans = {}
+        for e in elements:
+            level_to_spans.setdefault(e.get_data("level"), []).append(
+                (e.start_x, e.end_x)
+            )
+        level_to_lookup = {}
+        for level, spans in level_to_spans.items():
+            spans.sort()
+            level_to_lookup[level] = (
+                [start for start, _ in spans],
+                list(itertools.accumulate((end for _, end in spans), max)),
+            )
+
+        def cuts_through_a_unit(x: float, max_level: int) -> bool:
+            for level, (starts, max_ends) in level_to_lookup.items():
+                if level > max_level:
+                    continue
+                i = bisect.bisect_left(starts, x)
+                if i > 0 and max_ends[i - 1] > x:
+                    return True
+            return False
+
+        selected = set(self.selected_elements)
+        handle_to_x = {}
+        handle_to_min_level = {}
+        selected_handles = set()
+        for e in elements:
+            level = e.get_data("level")
+            for handle, x in ((e.start_handle, e.start_x), (e.end_handle, e.end_x)):
+                handle_to_x[handle] = x
+                handle_to_min_level[handle] = min(
+                    level, handle_to_min_level.get(handle, level)
+                )
+            if e in selected:
+                selected_handles.update((e.start_handle, e.end_handle))
+
+        for handle, x in handle_to_x.items():
+            handle.setVisible(
+                handle in selected_handles
+                or not cuts_through_a_unit(x, handle_to_min_level[handle])
+            )
 
     def get_all_elements_boundaries(self) -> set[int]:
         """Returns all the start_x and end_x values for hierarchy ui's in timeline."""

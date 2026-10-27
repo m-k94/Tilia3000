@@ -271,9 +271,11 @@ class HierarchyUI(TimelineUIElement):
 
     def update_end(self):
         self.update_position()
+        self.timeline_ui.update_body_handles_visibility()
 
     def update_start(self):
         self.update_position()
+        self.timeline_ui.update_body_handles_visibility()
 
     def update_pre_start(self):
         self.update_frame_handle_position(
@@ -550,12 +552,14 @@ class HierarchyUI(TimelineUIElement):
             for ui in selected_descendants:
                 ui.pre_start_handle.setVisible(False)
                 ui.post_end_handle.setVisible(False)
+        self.timeline_ui.update_body_handles_visibility()
         post(Post.HIERARCHY_SELECTED)
 
     def on_deselect(self) -> None:
         self.body.on_deselect()
         self.pre_start_handle.setVisible(False)
         self.post_end_handle.setVisible(False)
+        self.timeline_ui.update_body_handles_visibility()
         post(Post.HIERARCHY_DESELECTED)
 
     def selected_ascendants(self) -> list[HierarchyUI]:
