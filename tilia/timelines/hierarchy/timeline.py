@@ -395,6 +395,10 @@ class HierarchyTLComponentManager(TimelineComponentManager):
             (2) end before (inclusive) last given unit's end; and
             (3) have the same parent as given units.
             Assumes all given units have the same parent.
+
+            When merging is unrestricted, (3) becomes having the same level as
+            the given units, so the merged unit covers every unit of that level
+            in the span, whatever its parent.
             """
 
             def sort_by_time(h):
@@ -409,16 +413,34 @@ class HierarchyTLComponentManager(TimelineComponentManager):
                     and h.parent == hs[0].parent
                 )
 
+            def is_between_selected_units_and_has_same_level(h: Hierarchy):
+                units_sorted_by_time = sorted(hs, key=sort_by_time)
+                return (
+                    h.start >= units_sorted_by_time[0].end
+                    and h.end <= units_sorted_by_time[-1].start
+                    and h.level == hs[0].level
+                )
+
             units_between = self.get_components_by_condition(
-                is_between_selected_units_and_has_same_parent,
+                (
+                    is_between_selected_units_and_has_same_level
+                    if unrestricted
+                    else is_between_selected_units_and_has_same_parent
+                ),
                 kind=ComponentKind.HIERARCHY,
             )
 
             return list(set(hs + units_between))
 
-        success, reason = _validate_common_parent(hierarchies)
-        if not success:
-            return success, reason
+        # Unrestricted merging is meant for presentation (e.g. screenshots of an
+        # analysis): units with different parents may be merged, even though the
+        # merged unit then crosses its former parents' boundaries.
+        unrestricted = self.timeline.unrestricted_merge
+
+        if not unrestricted:
+            success, reason = _validate_common_parent(hierarchies)
+            if not success:
+                return success, reason
 
         success, reason = _validate_at_least_two_units(hierarchies)
         if not success:
@@ -510,6 +532,11 @@ class HierarchyTimeline(Timeline):
     def merge_separator(self):
         """Separator to be placed between non-empty label and comments of merged units."""
         return settings.get("hierarchy_timeline", "merge_separator")
+
+    @property
+    def unrestricted_merge(self) -> bool:
+        """Whether units may be merged even if they don't share a parent."""
+        return settings.get("hierarchy_timeline", "unrestricted_merge")
 
     def setup_blank_timeline(self):
         """Create unit of level 1 encompassing whole timeline"""

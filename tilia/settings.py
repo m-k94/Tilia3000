@@ -117,6 +117,7 @@ class SettingsManager(QObject):
             "divider_height": 10,
             "prompt_create_level_below": "true",
             "merge_separator": "|",
+            "unrestricted_merge": "false",
             "label_font_size": 10,
             "label_bold": "false",
             "label_italic": "false",
